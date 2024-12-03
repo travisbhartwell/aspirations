@@ -1,0 +1,59 @@
+#!/usr/bin/env -S mycmd project run
+# -*- mode: shell-script; sh-shell: bash; sh-basic-offset: 4; sh-indentation: 4; coding: utf-8 -*-
+# shellcheck shell=bash
+
+set -o nounset -o errexit -o errtrace -o pipefail
+
+project.load_task_library "shell"
+
+#----------------------------------------
+# Constants
+# shellcheck disable=SC2154
+readonly BUILD_DIR="${MYPROJECT_BASE_DIR}/build"
+readonly EXECUTABLE="${BUILD_DIR}/aspirations"
+
+mycmd.trace "Set the following constants:"
+mycmd.trace "- BUILD_DIR:  ${BUILD_DIR}"
+mycmd.trace "- EXECUTABLE: ${EXECUTABLE}"
+
+#----------------------------------------
+# Project File Sets
+
+#----------------------------------------
+# Just myproject
+project.register_fileset MYPROJECT_ONLY
+# shellcheck disable=SC2154
+project.add_files_to_fileset MYPROJECT_ONLY "${MYPROJECT_PROJECT_FILE}"
+
+project.register_task_with_fileset list-myproject-only project.list-files MYPROJECT_ONLY
+project.register_task_with_fileset format-myproject-only project:shell.format MYPROJECT_ONLY
+project.register_task_with_fileset lint-myproject-only project:shell.lint MYPROJECT_ONLY
+
+#----------------------------------------
+# All Janet Files
+project.register_fileset JANET_FILES
+# shellcheck disable=SC2154
+project.find_files_for_fileset JANET_FILES "${MYPROJECT_BASE_DIR}" -type f -name "*.janet"
+project.register_task_with_fileset list-janet-files project.list-files JANET_FILES
+
+#----------------------------------------
+# Build Commands
+mycmd.init_bin jpm
+
+function jpm() {
+    mycmd.bin_execute jpm "${@}"
+}
+
+function build() {
+    jpm build
+}
+project.register_task build
+
+function execute() {
+    if [[ ! -e "${EXECUTABLE}" ]]; then
+        project.execute_tasks build
+    fi
+
+    "${EXECUTABLE}" "${@}"
+}
+project.register_task execute
