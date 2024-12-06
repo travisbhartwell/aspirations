@@ -44,7 +44,7 @@ project.register_task_with_fileset list-janet-files project.list-files JANET_FIL
 mycmd.init_bin jpm
 
 function exec-jpm() {
-    mycmd.bin_execute jpm -l "${@}"
+    mycmd.bin_execute jpm --local "${@}"
 }
 
 readonly JPM_TREE_JANET_PATH="${JPM_TREE_DIR}/bin/janet"
