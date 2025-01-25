@@ -1,5 +1,3 @@
-(import os)
-
 (defn main
   [& args]
   (if (= (length args) 0)
