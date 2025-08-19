@@ -1,0 +1,105 @@
+#!/usr/bin/env -S mycmd myproject run
+# -*- mode: shell-script; sh-shell: bash; sh-basic-offset: 4; sh-indentation: 4; coding: utf-8 -*-
+# shellcheck shell=bash
+
+set -o nounset -o errexit -o errtrace -o pipefail
+
+# --------------------------------------------------------------------------------------------------
+# Janet Language Related Tasks
+myproject.register_task_definition_file_description "Tasks related to the Janet programming language for the Aspirations project"
+
+mycmd.trace "The following variables set in the main task definition file are used here:"
+mycmd.trace "- BUILD_DIR:           ${BUILD_DIR}"
+mycmd.trace "- DATA_DIR:            ${DATA_DIR}"
+mycmd.trace "- EXECUTABLE:          ${EXECUTABLE}"
+mycmd.trace "- JANET_FORMAT_EXE:    ${JANET_FORMAT_EXE}"
+mycmd.trace "- JPM_TREE_DIR:        ${JPM_TREE_DIR}"
+mycmd.trace "- JPM_TREE_JANET_PATH: ${JPM_TREE_JANET_PATH}"
+
+mycmd.init_bin jpm
+
+function exec-jpm() {
+    mycmd.bin_execute jpm --local "${@}"
+}
+
+function deps() {
+    exec-jpm deps
+
+    if [[ -e "${JPM_TREE_JANET_PATH}" ]]; then
+        mycmd.trace "Janet symlink already exists"
+        return 0
+    fi
+
+    # Add a symlink to the system janet in place so scripts in ./jpm_tree will work
+    local janet_path
+    if ! janet_path="$(command -v janet 2>/dev/null)"; then
+        mycmd.error_output "Janet not found."
+        return 1
+    fi
+    readonly janet_path
+
+    if ! ln -s "${janet_path}" "${JPM_TREE_JANET_PATH}"; then
+        mycmd.error_output "Error creating symlink to system Janet."
+        return 1
+    fi
+}
+
+myproject.register_task deps
+myproject.register_task_description deps "Install the project dependencies with JPM."
+
+function build() {
+    exec-jpm build
+}
+
+myproject.register_task build
+myproject.register_task_description build "Build the project with JPM."
+
+function install() {
+    exec-jpm install
+}
+
+myproject.register_task install
+myproject.register_task_description install "Install the project artifacts with JPM."
+
+function execute() {
+    if [[ ! -e "${EXECUTABLE}" ]]; then
+        myproject.execute_tasks build
+    fi
+
+    "${EXECUTABLE}" "${@}"
+}
+
+myproject.register_task execute
+myproject.register_task_description execute "Execute the built 'aspirations' binary."
+
+function clean() {
+    local d
+
+    for d in "${BUILD_DIR}" "${JPM_TREE_DIR}"; do
+        if [[ -d "${d}" ]]; then
+            myproject.verbose_output "Removing '${d}'."
+            rm -rf "${d}" || true
+        fi
+    done
+}
+
+myproject.register_task clean
+myproject.register_task_description clean "Clean the project build artifacts."
+
+function format_janet_files() {
+    local -n fileset="${1}"
+
+    myproject.output_only_if_not_quiet "Formatting Janet files in fileset '${!fileset}'."
+
+    if [[ ! -e "${JANET_FORMAT_EXE}" ]]; then
+        myproject.execute_tasks deps
+    fi
+
+    "${JANET_FORMAT_EXE}" "${fileset[@]}"
+}
+myproject.register_task_with_fileset format \
+    format_janet_files \
+    JANET_FILES
+myproject.register_task_description format "Format project Janet files with janet-format."
+
+mycmd.trace "Finished loading the janet task definition file."
